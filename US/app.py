@@ -31,26 +31,26 @@ def fibonacci_request():
     as_ip = request.args.get('as_ip', 'localhost')
     as_port = request.args.get('as_port', '53533')
 
-    print(f"🔹 Querying AS {as_ip}:{as_port} for hostname {hostname}")
-
     if not all([number, as_ip, as_port]):
         return jsonify({"error": "Missing required parameters"}), 400
 
     fs_ip = get_ip_from_dns(hostname, as_ip, int(as_port))
-    print(f"🔹 AS Response - Resolved IP: {fs_ip}")
 
     if not fs_ip:
         return jsonify({"error": "Could not resolve hostname"}), 400
 
     fs_url = f"http://{fs_ip}:{fs_port}/fibonacci?number={number}"
-    print(f"🔹 Sending request to FS: {fs_url}")
 
     try:
         response = requests.get(fs_url, timeout=5)
-        response.raise_for_status()
-        return jsonify({"result": response.text}), 200
+        if response.status_code == 200:
+            return jsonify(response.json()), 200
+        elif response.status_code == 400:
+            return jsonify({"error": response.json().get("error", "Bad request to Fibonacci server")}), 400
+        else:
+            return jsonify({"error": "Fibonacci server error"}), response.status_code
     except requests.RequestException as e:
-        return jsonify({"error": "Failed to connect to Fibonacci server", "details": str(e)}), 400
+        return jsonify({"error": "Failed to connect to Fibonacci server", "details": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080, debug=True)
